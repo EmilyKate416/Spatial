@@ -1,0 +1,69 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-12-16"
+---
+# Purpose:
+# Convert spatial transcriptomics objects between formats for downstream use:
+# - SpatialExperiment <-> AnnData (via zellkonverter/reticulate)
+# - SpatialExperiment -> Zarr
+# - Seurat -> AnnData (via SeuratDisk)
+
+# ------------------------------------------------------------------------------
+# Inputs
+# ------------------------------------------------------------------------------
+# - spe_filt (SpatialExperiment object in R session)
+# - 20250204_nnSVG.rds (SpatialExperiment with nnSVG results)
+# - seurat_nnSVG.rds (Seurat object)
+
+# ------------------------------------------------------------------------------
+# Outputs
+# ------------------------------------------------------------------------------
+# - AnnData object in Python (`adata`) and back-converted SCE (`converted`)
+# - output_nnSVG.zarr (Zarr store of nnSVG SpatialExperiment)
+# - seurat_nnSVG.h5ad (AnnData file from Seurat object)
+# ------------------------------------------------------------------------------
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r convert spatial experiment object to anndata object}
+#devtools::install_github("https://github.com/theislab/zellkonverter")
+
+#These functions expect that r CRANpkg("reticulate") has already been loaded along with an appropriate version of the anndata package
+#from terminal, in r-reticulate environment, I installed anndata with pip install anndata
+reticulate::py_install(c("anndata", "scanpy"))
+#convert to anndata object
+adata <- zellkonverter::SCE2AnnData(spe_filt)
+ 
+# Maybe do some work in Python on 'adata':
+    # BLAH BLAH BLAH
+
+    # Convert back to an SCE:
+converted <- zellkonverter::AnnData2SCE(adata)
+```
+
+```{r}
+# Convert SpatialExperiment to Zarr (R)
+library(SpatialExperiment)
+library(zarr)
+
+# Load nnSVG results
+spe_nnSVG <- readRDS("20250204_nnSVG.rds")
+
+# Convert to Zarr format
+zarr::save_zarr(spe_nnSVG, "output_nnSVG.zarr")
+
+# Convert Seurat to AnnData (R)
+library(SeuratDisk)
+
+# Convert Seurat object to AnnData (H5AD format)
+seurat_obj <- readRDS("seurat_nnSVG.rds")
+SaveH5Seurat(seurat_obj, filename = "seurat_nnSVG.h5Seurat")
+Convert("seurat_nnSVG.h5Seurat", dest = "h5ad", overwrite = TRUE)
+
+```
+
+
