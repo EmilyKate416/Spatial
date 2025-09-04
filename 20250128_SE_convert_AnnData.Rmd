@@ -64,6 +64,16 @@ seurat_obj <- readRDS("seurat_nnSVG.rds")
 SaveH5Seurat(seurat_obj, filename = "seurat_nnSVG.h5Seurat")
 Convert("seurat_nnSVG.h5Seurat", dest = "h5ad", overwrite = TRUE)
 
+#to convert seurat object to h5ad, first convert to sce, then h5ad 
+library(SingleCellExperiment)
+sce <- as.SingleCellExperiment(test)
+
+library(zellkonverter)
+
+zellkonverter::writeH5AD(
+    sce,
+    file = "merged_seurat_upk10sc.h5ad")
 ```
+
 
 
