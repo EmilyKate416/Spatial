@@ -1,5 +1,5 @@
 
-# Spatial QC and Registration Scripts
+# Spatial Image Co-registration Scripts and Cell2location
 
 ## Purpose
 This repository contains R and Python workflows for spatial transcriptomics (Visium) data:
