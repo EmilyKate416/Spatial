@@ -35,14 +35,91 @@ knitr::opts_chunk$set(echo = TRUE)
 #These functions expect that r CRANpkg("reticulate") has already been loaded along with an appropriate version of the anndata package
 #from terminal, in r-reticulate environment, I installed anndata with pip install anndata
 reticulate::py_install(c("anndata", "scanpy"))
-#convert to anndata object
+#convert spatial object loaded in R to anndata object
 adata <- zellkonverter::SCE2AnnData(spe_filt)
  
 # Maybe do some work in Python on 'adata':
     # BLAH BLAH BLAH
 
     # Convert back to an SCE:
-converted <- zellkonverter::AnnData2SCE(adata)
+#converted <- zellkonverter::AnnData2SCE(adata)
+
+#load and convert spatial or single cell object 
+#or read and convert h5ad adata object to rds
+singlecell <- zellkonverter::readH5AD("/run/user/1804238067/gvfs/sftp:host=clust1-sub-1,user=lythgo02/mnt/scratchc/fmlab/lythgo02/OV_visium/emily/cell2location/upk10_sc_400_newlyAnnot.h5ad")
+# Convert SCE to Seurat
+seurat_obj <- as.Seurat(
+  singlecell,              # your SingleCellExperiment object
+  counts = "counts", # assay to use as raw counts
+  data = "logcounts" # optional: assay to use as normalized data
+)
+
+# Save the Seurat object (R-native, metadata preserved)
+
+saveRDS(singlecell, file="/tmp/upk10_sc_400_newlyAnnot_noconvert.rds")
+saveRDS(seurat_obj, file="/run/user/1804238067/gvfs/sftp:host=clust1-sub-1,user=lythgo02/mnt/scratchc/fmlab/lythgo02/OV_visium/emily/cell2location/upk10_sc_400_newlyAnnot.rds")
+
+adata <- zellkonverter::readH5AD("/run/user/1804238067/gvfs/sftp:host=clust1-sub-1,user=lythgo02/mnt/scratchc/fmlab/lythgo02/OV_visium/emily/cell2location/final_adata_vis_clean.h5ad")
+# Convert SCE to Seurat
+seurat_obj <- as.Seurat(
+  adata,              # your SingleCellExperiment object
+  counts = "raw_counts", # assay to use as raw counts
+  data = "X" # optional: assay to use as normalized data
+)
+
+#NOTE SEE BELOW TO PRESERVE ALL OF THE INFO IN THE SPATIAL OBJECT INCLUDING COORDINATE AND IMAGE DETAILS 
+# Save the Seurat object (R-native, metadata preserved)
+saveRDS(adata, file="/tmp/final_adata_vis_clean_noconvert.rds")
+
+```
+```{r}
+
+library(zellkonverter)
+library(Seurat)
+library(SeuratObject)
+library(dplyr)
+
+# 1. Load the AnnData object
+adata <- zellkonverter::readH5AD(
+  "/run/user/1804238067/gvfs/sftp:host=clust1-sub-1,user=lythgo02/mnt/scratchc/fmlab/lythgo02/OV_visium/emily/cell2location/final_adata_vis_clean.h5ad"
+)
+
+# 2. Convert to Seurat (expression data only)
+seurat_obj <- as.Seurat(
+  adata,
+  counts = "raw_counts",
+  data = "X"
+)
+
+# 3. Extract sample per spot
+sample <- colData(adata)$sample
+seurat_obj@meta.data$sample <- sample
+
+# 4. Extract coordinates and image info
+coords <- reducedDim(adata, "spatial")
+coords_list <- split(as.data.frame(coords), sample)
+image_list <- metadata(adata)$spatial
+
+
+# 5. Assign images and coordinates to Seurat in a CellTrek-compatible way
+for (sample_name in names(coords_list)) {
+  sp_coords <- coords_list[[sample_name]]
+  img_info <- image_list[[sample_name]]
+  
+  # Make sure image is an array (CellTrek expects array)
+  seurat_obj@images[[sample_name]] <- list(
+    image = as.array(img_info$image),
+    scale.factors = img_info$scalef,
+    coordinates = sp_coords
+  )
+}
+# 5. Store original coordinates for reference
+seurat_obj@misc$spatial_coords <- coords_list
+seurat_obj@misc$spatial_images <- image_list
+
+# 8. Save Seurat object
+saveRDS(seurat_obj, file="/tmp/final_adata_vis_clean_seurat.rds")
+
 ```
 
 ```{r}
@@ -68,12 +145,52 @@ Convert("seurat_nnSVG.h5Seurat", dest = "h5ad", overwrite = TRUE)
 library(SingleCellExperiment)
 sce <- as.SingleCellExperiment(test)
 
-library(zellkonverter)
-
 zellkonverter::writeH5AD(
     sce,
     file = "merged_seurat_upk10sc.h5ad")
 ```
 
 
+```{r}
+library(zellkonverter)  # for readH5AD
+library(Seurat)
+
+# Folder where you saved your split .h5ad files
+split_dir <- "/home/lythgo02/Documents/OV_visium/split_by_sample/"  # <-- adjust
+files <- list.files(split_dir,
+                    pattern = "^final_adata_vis_clean_\\d+\\.h5ad$",
+                    full.names = TRUE)
+
+# Sort for reproducibility (1..6)
+files <- files[order(nchar(files), files)]
+
+# Read each file and convert to Seurat
+seurat_list <- lapply(files, function(f) {
+  adata <- zellkonverter::readH5AD(f)
+  seurat_obj <- as.Seurat(
+    adata,
+    counts = "raw_counts",
+    data   = "X"
+  )
+  return(seurat_obj)
+})
+
+# Give them names sample_1 … sample_6
+names(seurat_list) <- sub("^.*_(\\d+)\\.h5ad$", "sample_\\1", basename(files))
+
+# Quick sanity check
+sapply(seurat_list, dim)
+
+# Save each Seurat as RDS (optional)
+out_rds_dir <- file.path(split_dir, "rds")
+dir.create(out_rds_dir, showWarnings = FALSE)
+
+invisible(lapply(names(seurat_list), function(nm) {
+  saveRDS(seurat_list[[nm]], file = file.path(out_rds_dir, paste0(nm, ".rds")))
+}))
+
+# Or save the whole list as one RDS
+saveRDS(seurat_list, file = file.path(out_rds_dir, "seurat_list_all.rds"))
+
+```
 
