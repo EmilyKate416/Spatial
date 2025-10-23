@@ -19,8 +19,7 @@ This repository contains R and Python workflows for spatial transcriptomics (Vis
 - `co-register_with_valis.ipynb` - notebook for co-registration of images with valis after preprocessing via comet.py/ultivue.py and submit_savetoVIPS.sh
 - `human_visium_run_cell2location.ipynb` - notebook for running cell2location on my visium samples
 - `prepare_scRNAseq_cell2location.ipynb` - notebook for preprocessing of single cell RNA reference dataset prior to running cell2location
-- `mouse_run_cell2location.ipynb` - notebook for scanpy based preprocessing of scRNAseq and spatial data and running cell2location
-- `mouse_cellTrek.ipynb` - notebook for Seurat based preprocessing of scRNAseq and spatial data (following anndata/SCE - Seurat conversion) and running of CellTrek
+
 ---
 
 

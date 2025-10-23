@@ -157,39 +157,60 @@ library(Seurat)
 
 # Folder where you saved your split .h5ad files
 split_dir <- "/home/lythgo02/Documents/OV_visium/split_by_sample/"  # <-- adjust
-files <- list.files(split_dir,
-                    pattern = "^final_adata_vis_clean_\\d+\\.h5ad$",
-                    full.names = TRUE)
+# list the actual files
+files <- list.files(split_dir, pattern = "^final_adata_vis_clean_OV_\\d+\\.h5ad$", full.names = TRUE)
 
-# Sort for reproducibility (1..6)
-files <- files[order(nchar(files), files)]
+# extract sample names
+sample_names <- sub("\\.h5ad$", "", basename(files))  # "final_adata_vis_clean_OV_1" etc.
 
-# Read each file and convert to Seurat
-seurat_list <- lapply(files, function(f) {
+seurat_list <- lapply(seq_along(files), function(i) {
+  f <- files[i]
   adata <- zellkonverter::readH5AD(f)
+
+  # 1) Convert to Seurat with your assays
   seurat_obj <- as.Seurat(
     adata,
     counts = "raw_counts",
     data   = "X"
   )
-  return(seurat_obj)
+
+  # 2) Sample per spot
+  sample <- colData(adata)$sample
+  seurat_obj@meta.data$sample <- sample
+
+  # 3) Coordinates and image info
+  coords <- reducedDim(adata, "spatial")
+  coords_list <- split(as.data.frame(coords), sample)
+  image_list  <- metadata(adata)$spatial
+
+  # 4) Assign images/coords as simple lists (your original approach)
+  for (sample_name in names(coords_list)) {
+    sp_coords <- coords_list[[sample_name]]
+    img_info  <- image_list[[sample_name]]
+
+    seurat_obj@images[[sample_name]] <- list(
+      image         = as.array(img_info$image),
+      scale.factors = img_info$scalef,
+      coordinates   = sp_coords
+    )
+  }
+
+  # 5) Store originals
+  seurat_obj@misc$spatial_coords <- coords_list
+  seurat_obj@misc$spatial_images <- image_list
+  seurat_obj@misc$from_h5ad_file <- basename(f)
+
+  seurat_obj
 })
 
-# Give them names sample_1 … sample_6
-names(seurat_list) <- sub("^.*_(\\d+)\\.h5ad$", "sample_\\1", basename(files))
+names(seurat_list) <- sub("^.*_(\\d+)\\.h5ad$", "OV_\\1", basename(files))
 
-# Quick sanity check
-sapply(seurat_list, dim)
-
-# Save each Seurat as RDS (optional)
+# Optional saves
 out_rds_dir <- file.path(split_dir, "rds")
 dir.create(out_rds_dir, showWarnings = FALSE)
-
 invisible(lapply(names(seurat_list), function(nm) {
   saveRDS(seurat_list[[nm]], file = file.path(out_rds_dir, paste0(nm, ".rds")))
 }))
-
-# Or save the whole list as one RDS
 saveRDS(seurat_list, file = file.path(out_rds_dir, "seurat_list_all.rds"))
 
 ```
