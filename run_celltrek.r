@@ -1,4 +1,25 @@
 #!/usr/bin/env Rscript
+# ------------------------------------------------------------------------------
+# Purpose:
+# Run the CellTrek spatial mapping pipeline to project single-cell transcriptomic
+# profiles onto Visium spatial transcriptomics samples using pre-trained
+# cell2location integration models.
+#
+# ------------------------------------------------------------------------------
+# Inputs
+# ------------------------------------------------------------------------------
+# - cellTrek/ovTrainAll_obj.rds : list of trained cell2location SpatialExperiment objects
+# - cellTrek/seuSub.rds         : Seurat single-cell reference object
+#
+# ------------------------------------------------------------------------------
+# Outputs
+# ------------------------------------------------------------------------------
+# - celltrek_results*.rds       : individual CellTrek results per sample
+# - celltrek_results.rds        : combined list of CellTrek outputs
+# - merged_celltrek.rds         : merged and co-embedded Seurat object
+# - celltrek_progress           : log file capturing runtime and progress messages
+# ------------------------------------------------------------------------------
+
 
 # --- load libraries ---
 library(CellTrek)
